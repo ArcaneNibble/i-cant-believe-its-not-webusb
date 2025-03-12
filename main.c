@@ -618,18 +618,82 @@ void do_u2f_cmd() {
         res_sz = cmd_sz;
         res_seq = 0;
         res_pos = MIN(64 - 7, res_sz);
+    }
 
-        memcpy(usb_buf, &cid_in_progress, 4);
-        usb_buf[4] = cmd_in_progress;
-        usb_buf[5] = res_sz >> 8;
-        usb_buf[6] = res_sz;
-        memcpy(&usb_buf[7], res_buf, res_pos);
-        usb_start_transfer(ep2, usb_buf, 7 + res_pos);
+    if (cmd_in_progress == 0x83) {
+        // CTAPHID_MSG
+        uint16_t cla_ins = (cmd_buf[0] << 8) | cmd_buf[1];
 
-        if (res_pos == res_sz) {
-            cmd_in_progress = 0;
-            cid_in_progress = 0;
+        if (cla_ins == 0x0003) {
+            // U2F_VERSION
+            res_buf[0] = 'U';
+            res_buf[1] = '2';
+            res_buf[2] = 'F';
+            res_buf[3] = '_';
+            res_buf[4] = 'V';
+            res_buf[5] = '2';
+            res_buf[6] = 0x90;
+            res_buf[7] = 0x00;
+            res_sz = res_pos = 8;
+        } else if (cla_ins == 0x0002) {
+            // U2F_AUTHENTICATE
+
+            if (cmd_buf[2] == 0x07) {
+                // check-only
+                if (cmd_buf[7 +  9] == 0xfe && cmd_buf[7 + 10] == 0xed && cmd_buf[7 + 11] == 0xfa && cmd_buf[7 + 12] == 0xce) {
+                    // ok
+                    res_buf[0] = 0x69;
+                    res_buf[1] = 0x85;
+                    res_sz = res_pos = 2;
+                } else {
+                    // not ok
+                    res_buf[0] = 0x69;
+                    res_buf[1] = 0x84;
+                    res_sz = res_pos = 2;
+                }
+            } else {
+                if (!(cmd_buf[7 +  9] == 0xfe && cmd_buf[7 + 10] == 0xed && cmd_buf[7 + 11] == 0xfa && cmd_buf[7 + 12] == 0xce)) {
+                    // not ok
+                    res_buf[0] = 0x69;
+                    res_buf[1] = 0x84;
+                    res_sz = res_pos = 2;
+                } else {
+                    res_buf[0] = 0x01;  // user presence
+                    res_buf[1] = 0xde;  // counter
+                    res_buf[2] = 0xad;
+                    res_buf[3] = 0xbe;
+                    res_buf[4] = 0xef;
+
+                    // copy bytes [13-16] to signature, except inverted
+                    res_buf[5] = cmd_buf[7 + 13] ^ 0xff;
+                    res_buf[6] = cmd_buf[7 + 14] ^ 0xff;
+                    res_buf[7] = cmd_buf[7 + 15] ^ 0xff;
+                    res_buf[8] = cmd_buf[7 + 16] ^ 0xff;
+
+                    res_buf[9] = 0x90;
+                    res_buf[10] = 0x00;
+                    res_sz = res_pos = 11;
+                }
+            }
+        } else {
+            // unsupported
+            res_buf[0] = 0x6d;
+            res_buf[1] = 0x00;
+            res_sz = res_pos = 2;
         }
+    }
+
+    // common setup for response
+    memcpy(usb_buf, &cid_in_progress, 4);
+    usb_buf[4] = cmd_in_progress;
+    usb_buf[5] = res_sz >> 8;
+    usb_buf[6] = res_sz;
+    memcpy(&usb_buf[7], res_buf, res_pos);
+    usb_start_transfer(ep2, usb_buf, 7 + res_pos);
+
+    if (res_pos == res_sz) {
+        cmd_in_progress = 0;
+        cid_in_progress = 0;
     }
 }
 
