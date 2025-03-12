@@ -36,6 +36,8 @@
 #define USB_DT_STRING 0x03
 #define USB_DT_INTERFACE 0x04
 #define USB_DT_ENDPOINT 0x05
+#define USB_DT_HID 0x21
+#define USB_DT_HID_REPORT 0x22
 
 #define USB_REQUEST_GET_STATUS 0x0
 #define USB_REQUEST_CLEAR_FEATURE 0x01
@@ -118,6 +120,16 @@ struct usb_endpoint_descriptor {
     uint8_t bmAttributes;
     uint16_t wMaxPacketSize;
     uint8_t bInterval;
+} __packed;
+
+struct usb_hid_descriptor {
+    uint8_t bLength;
+    uint8_t bDescriptorType;
+    uint16_t bcdHID;
+    uint8_t bCountryCode;
+    uint8_t bNumDescriptors;
+    uint8_t bDescriptorType0;
+    uint16_t wDescriptorLength0;
 } __packed;
 
 struct usb_endpoint_descriptor_long {

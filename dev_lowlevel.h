@@ -30,6 +30,7 @@ struct usb_endpoint_configuration {
 struct usb_device_configuration {
     const struct usb_device_descriptor *device_descriptor;
     const struct usb_interface_descriptor *interface_descriptor;
+    const struct usb_hid_descriptor *hid_descriptor;
     const struct usb_configuration_descriptor *config_descriptor;
     const unsigned char *lang_descriptor;
     const unsigned char **descriptor_strings;
@@ -70,8 +71,8 @@ static const struct usb_device_descriptor device_descriptor = {
         .bDeviceSubClass = 0,      // No subclass
         .bDeviceProtocol = 0,      // No protocol
         .bMaxPacketSize0 = 64,     // Max packet size for ep0
-        .idVendor        = 0x0000, // Your vendor id
-        .idProduct       = 0x0001, // Your product ID
+        .idVendor        = 0xf055, // Your vendor id
+        .idProduct       = 0x0000, // Your product ID
         .bcdDevice       = 0,      // No device revision number
         .iManufacturer   = 1,      // Manufacturer string index
         .iProduct        = 2,      // Product string index
@@ -85,17 +86,50 @@ static const struct usb_interface_descriptor interface_descriptor = {
         .bInterfaceNumber   = 0,
         .bAlternateSetting  = 0,
         .bNumEndpoints      = 2,    // Interface has 2 endpoints
-        .bInterfaceClass    = 0xff, // Vendor specific endpoint
+        .bInterfaceClass    = 0x03, // HID
         .bInterfaceSubClass = 0,
         .bInterfaceProtocol = 0,
         .iInterface         = 0
+};
+
+static const unsigned char report_descriptor[] = {
+        0x06, 0xd0, 0xf1, /* USAGE_PAGE (FIDO Alliance) */
+        0x09, 0x01,       /* USAGE (U2F Authenticator Device) */
+
+        0xa1, 0x01,       /* COLLECTION (Application) */
+
+        0x09, 0x20,       /*   USAGE (Input report data) */
+        0x15, 0x00,       /*   LOGICAL_MINIMUM (0) */
+        0x26, 0xff, 0x00, /*   LOGICAL_MAXIMUM (255) */
+        0x75, 0x08,       /*   REPORT_SIZE (8) */
+        0x95, 0x40,       /*   REPORT_COUNT (64) */
+        0x81, 0x02,       /*   INPUT (Data,Var,Abs); Modifier byte */
+
+        0x09, 0x21,       /*   USAGE (Output report data) */
+        0x15, 0x00,       /*   LOGICAL_MINIMUM (0) */
+        0x26, 0xff, 0x00, /*   LOGICAL_MAXIMUM (255) */
+        0x75, 0x08,       /*   REPORT_SIZE (8) */
+        0x95, 0x40,       /*   REPORT_COUNT (64) */
+        0x91, 0x02,       /*   OUTPUT (Data,Var,Abs); Modifier byte */
+
+        0xc0              /* END_COLLECTION */
+};
+
+static const struct usb_hid_descriptor hid_descriptor = {
+        .bLength                = sizeof(struct usb_hid_descriptor),
+        .bDescriptorType        = USB_DT_HID,
+        .bcdHID                 = 0x111,
+        .bCountryCode           = 0,
+        .bNumDescriptors        = 1,
+        .bDescriptorType0       = USB_DT_HID_REPORT,
+        .wDescriptorLength0     = sizeof(report_descriptor),
 };
 
 static const struct usb_endpoint_descriptor ep1_out = {
         .bLength          = sizeof(struct usb_endpoint_descriptor),
         .bDescriptorType  = USB_DT_ENDPOINT,
         .bEndpointAddress = EP1_OUT_ADDR, // EP number 1, OUT from host (rx to device)
-        .bmAttributes     = USB_TRANSFER_TYPE_BULK,
+        .bmAttributes     = USB_TRANSFER_TYPE_INTERRUPT,
         .wMaxPacketSize   = 64,
         .bInterval        = 0
 };
@@ -104,7 +138,7 @@ static const struct usb_endpoint_descriptor ep2_in = {
         .bLength          = sizeof(struct usb_endpoint_descriptor),
         .bDescriptorType  = USB_DT_ENDPOINT,
         .bEndpointAddress = EP2_IN_ADDR, // EP number 2, IN from host (tx from device)
-        .bmAttributes     = USB_TRANSFER_TYPE_BULK,
+        .bmAttributes     = USB_TRANSFER_TYPE_INTERRUPT,
         .wMaxPacketSize   = 64,
         .bInterval        = 0
 };
@@ -114,6 +148,7 @@ static const struct usb_configuration_descriptor config_descriptor = {
         .bDescriptorType = USB_DT_CONFIG,
         .wTotalLength    = (sizeof(config_descriptor) +
                             sizeof(interface_descriptor) +
+                            sizeof(hid_descriptor) +
                             sizeof(ep1_out) +
                             sizeof(ep2_in)),
         .bNumInterfaces  = 1,
@@ -130,8 +165,8 @@ static const unsigned char lang_descriptor[] = {
 };
 
 static const unsigned char *descriptor_strings[] = {
-        (unsigned char *) "Raspberry Pi",    // Vendor
-        (unsigned char *) "Pico Test Device" // Product
+        (unsigned char *) "ArcaneNibble",       // Vendor
+        (unsigned char *) "U2F Hax"             // Product
 };
 
 #endif

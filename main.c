@@ -48,6 +48,7 @@ static uint8_t ep0_buf[64];
 static struct usb_device_configuration dev_config = {
         .device_descriptor = &device_descriptor,
         .interface_descriptor = &interface_descriptor,
+        .hid_descriptor = &hid_descriptor,
         .config_descriptor = &config_descriptor,
         .lang_descriptor = lang_descriptor,
         .descriptor_strings = descriptor_strings,
@@ -289,6 +290,8 @@ void usb_handle_config_descriptor(volatile struct usb_setup_packet *pkt) {
     if (pkt->wLength >= d->wTotalLength) {
         memcpy((void *) buf, dev_config.interface_descriptor, sizeof(struct usb_interface_descriptor));
         buf += sizeof(struct usb_interface_descriptor);
+        memcpy((void *) buf, dev_config.hid_descriptor, sizeof(struct usb_hid_descriptor));
+        buf += sizeof(struct usb_hid_descriptor);
         const struct usb_endpoint_configuration *ep = dev_config.endpoints;
 
         // Copy all the endpoint descriptors starting from EP1
@@ -304,6 +307,23 @@ void usb_handle_config_descriptor(volatile struct usb_setup_packet *pkt) {
     // Send data
     // Get len by working out end of buffer subtract start of buffer
     uint32_t len = (uint32_t) buf - (uint32_t) &ep0_buf[0];
+    usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), &ep0_buf[0], MIN(len, pkt->wLength));
+}
+
+void usb_handle_hid_descriptor(volatile struct usb_setup_packet *pkt) {
+    uint8_t *buf = &ep0_buf[0];
+
+    const struct usb_hid_descriptor *d = dev_config.hid_descriptor;
+    memcpy((void *) buf, d, sizeof(struct usb_hid_descriptor));
+    buf += sizeof(struct usb_hid_descriptor);
+    uint32_t len = (uint32_t) buf - (uint32_t) &ep0_buf[0];
+    usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), &ep0_buf[0], MIN(len, pkt->wLength));
+}
+
+void usb_handle_report_descriptor(volatile struct usb_setup_packet *pkt) {
+    uint8_t *buf = &ep0_buf[0];
+    memcpy((void *) buf, report_descriptor, sizeof(report_descriptor));
+    uint32_t len = sizeof(report_descriptor);
     usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), &ep0_buf[0], MIN(len, pkt->wLength));
 }
 
@@ -415,6 +435,27 @@ void usb_handle_setup_packet(void) {
                 case USB_DT_STRING:
                     usb_handle_string_descriptor(pkt);
                     printf("GET STRING DESCRIPTOR\r\n");
+                    break;
+
+                default:
+                    printf("Unhandled GET_DESCRIPTOR type 0x%x\r\n", descriptor_type);
+            }
+        } else {
+            printf("Other IN request (0x%x)\r\n", pkt->bRequest);
+        }
+    } else if (req_direction == 0x81) {
+        if (req == USB_REQUEST_GET_DESCRIPTOR) {
+            uint16_t descriptor_type = pkt->wValue >> 8;
+
+            switch (descriptor_type) {
+                case USB_DT_HID:
+                    usb_handle_hid_descriptor(pkt);
+                    printf("GET HID DESCRIPTOR\r\n");
+                    break;
+
+                case USB_DT_HID_REPORT:
+                    usb_handle_report_descriptor(pkt);
+                    printf("GET HID REPORT DESCRIPTOR\r\n");
                     break;
 
                 default:
