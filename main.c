@@ -589,18 +589,182 @@ void ep0_in_handler(__unused uint8_t *buf, __unused uint16_t len) {
 void ep0_out_handler(__unused uint8_t *buf, __unused uint16_t len) {
 }
 
-// Device specific functions
+
+//////// U2F HAX STUFF
+
+uint8_t cmd_buf[7609];
+size_t cmd_pos;
+size_t cmd_sz;
+int cmd_seq;
+int cmd_in_progress;
+
+uint8_t res_buf[7609];
+size_t res_pos;
+size_t res_sz;
+int res_seq;
+
+uint8_t usb_buf[64];
+
+uint32_t cid_in_progress;
+uint32_t cid_next;
+
+void do_u2f_cmd() {
+    struct usb_endpoint_configuration *ep2 = usb_get_endpoint_configuration(EP2_IN_ADDR);
+
+    if (cmd_in_progress == 0x81) {
+        // CTAPHID_PING
+        memcpy(res_buf, cmd_buf, cmd_sz);
+
+        res_sz = cmd_sz;
+        res_seq = 0;
+        res_pos = MIN(64 - 7, res_sz);
+
+        memcpy(usb_buf, &cid_in_progress, 4);
+        usb_buf[4] = cmd_in_progress;
+        usb_buf[5] = res_sz >> 8;
+        usb_buf[6] = res_sz;
+        memcpy(&usb_buf[7], res_buf, res_pos);
+        usb_start_transfer(ep2, usb_buf, 7 + res_pos);
+
+        if (res_pos == res_sz) {
+            cmd_in_progress = 0;
+            cid_in_progress = 0;
+        }
+    }
+}
+
 void ep1_out_handler(uint8_t *buf, uint16_t len) {
     printf("RX %d bytes from host\n", len);
-    // Send data back to host
-    struct usb_endpoint_configuration *ep = usb_get_endpoint_configuration(EP2_IN_ADDR);
-    usb_start_transfer(ep, buf, len);
+
+    struct usb_endpoint_configuration *ep2 = usb_get_endpoint_configuration(EP2_IN_ADDR);
+
+    uint32_t this_cid;
+    memcpy(&this_cid, buf, 4);
+
+    if (buf[4] & 0x80) {
+        // init packet
+        uint16_t bcnt = (buf[5] << 8) | buf[6];
+
+        if (this_cid == 0) goto out;
+
+        switch (buf[4]) {
+            case 0x86:
+                // CTAPHID_INIT
+                if (bcnt != 8) {
+                    // invalid len
+                    memcpy(usb_buf, buf, 4);
+                    usb_buf[4] = 0xbf;
+                    usb_buf[5] = 0;
+                    usb_buf[6] = 1;
+                    usb_buf[7] = 3;
+                    usb_start_transfer(ep2, usb_buf, 8);
+                    break;
+                }
+
+                // allocate a new channel id
+                uint32_t new_cid = this_cid;
+                if (new_cid = 0xffffffff) {
+                    ++cid_next;
+                    if (!cid_next) ++cid_next;
+                    new_cid = cid_next;
+                }
+
+                memcpy(usb_buf, buf, 4);
+                usb_buf[4] = 0x86;
+                usb_buf[5] = 0;
+                usb_buf[6] = 17;
+                memcpy(&usb_buf[7], &buf[7], 8);
+                memcpy(&usb_buf[15], &new_cid, 4);
+                usb_buf[19] = 2;
+                usb_buf[20] = 0;
+                usb_buf[21] = 0;
+                usb_buf[22] = 0;
+                usb_buf[23] = 0;
+                usb_start_transfer(ep2, usb_buf, 24);
+                break;
+
+            case 0x81:
+            case 0x83:
+                // CTAPHID_MSG or CTAPHID_PING
+                if (cid_in_progress) {
+                    // busy
+                    memcpy(usb_buf, buf, 4);
+                    usb_buf[4] = 0xbf;
+                    usb_buf[5] = 0;
+                    usb_buf[6] = 1;
+                    usb_buf[7] = 6;
+                    usb_start_transfer(ep2, usb_buf, 8);
+                    break;
+                }
+
+                cid_in_progress = this_cid;
+                cmd_in_progress = buf[4];
+                cmd_sz = bcnt;
+                cmd_pos = MIN(64 - 7, bcnt);
+                cmd_seq = 0;
+                memcpy(cmd_buf, &buf[7], cmd_pos);
+
+                if (cmd_pos == cmd_sz)
+                    do_u2f_cmd();
+                break;
+
+            default:
+                // invalid command
+                memcpy(usb_buf, buf, 4);
+                usb_buf[4] = 0xbf;
+                usb_buf[5] = 0;
+                usb_buf[6] = 1;
+                usb_buf[7] = 1;
+                usb_start_transfer(ep2, usb_buf, 8);
+                break;
+        }
+    } else {
+        // continuation
+        if (cmd_in_progress && cid_in_progress == this_cid) {
+            if (buf[4] == cmd_seq) {
+                // valid seq
+                uint32_t chunk_sz = MIN(64 - 5, cmd_sz - cmd_pos);
+                memcpy(&cmd_buf[cmd_pos], &buf[5], chunk_sz);
+                cmd_pos += chunk_sz;
+                cmd_seq++;
+
+                if (cmd_pos == cmd_sz)
+                    do_u2f_cmd();
+            } else {
+                // invalid seq
+                memcpy(usb_buf, buf, 4);
+                usb_buf[4] = 0xbf;
+                usb_buf[5] = 0;
+                usb_buf[6] = 1;
+                usb_buf[7] = 4;
+                usb_start_transfer(ep2, usb_buf, 8);
+            }
+        }
+    }
+
+out:
+    // Get ready to rx again from host
+    usb_start_transfer(usb_get_endpoint_configuration(EP1_OUT_ADDR), NULL, 64);
 }
 
 void ep2_in_handler(__unused uint8_t *buf, uint16_t len) {
     printf("Sent %d bytes to host\n", len);
-    // Get ready to rx again from host
-    usb_start_transfer(usb_get_endpoint_configuration(EP1_OUT_ADDR), NULL, 64);
+
+    struct usb_endpoint_configuration *ep2 = usb_get_endpoint_configuration(EP2_IN_ADDR);
+
+    if (res_pos != res_sz) {
+        uint32_t chunk_sz = MIN(64 - 5, res_sz - res_pos);
+        memcpy(usb_buf, &cid_in_progress, 4);
+        usb_buf[4] = res_seq++;
+        memcpy(&usb_buf[5], &res_buf[res_pos], chunk_sz);
+        usb_start_transfer(ep2, usb_buf, 5 + chunk_sz);
+
+        res_pos += chunk_sz;
+        if (res_pos == res_sz) {
+            cmd_in_progress = 0;
+            cid_in_progress = 0;
+        }
+    }
 }
 
 int main(void) {
