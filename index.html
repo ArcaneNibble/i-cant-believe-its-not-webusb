@@ -3,30 +3,43 @@
     <head>
         <meta charset="utf-8">
         <script>
-            async function do_stuff(led_value) {
-                console.log("hi!");
-                let credential = await navigator.credentials.get({
-                    publicKey: {
-                        challenge: new Uint8Array([]),
-                        allowCredentials: [{
-                            type: "public-key",
-                            transports: ["usb"],
-                            id: new Uint8Array([0xfe, 0xed, 0xfa, 0xce, 0xde, 0xad, 0xbe, 0xef, led_value ? 1 : 0])
-                        }],
-                        userVerification: "discouraged",
-                    }
-                });
-                console.log(credential);
+            let led_state = 0;
+
+            async function poll_pin() {
+                try {
+                    let credential = await navigator.credentials.get({
+                        publicKey: {
+                            challenge: new Uint8Array([]),
+                            allowCredentials: [{
+                                type: "public-key",
+                                transports: ["usb"],
+                                id: new Uint8Array([0xfe, 0xed, 0xfa, 0xce, 0xde, 0xad, 0xbe, 0xef, led_state])
+                            }],
+                            userVerification: "discouraged",
+                        }
+                    });
+                    let sig = new Uint8Array(credential.response.signature);
+                    let pin = sig[9];
+                    let poll_result = document.getElementById("poll_result");
+                    poll_result.innerText = "Pin is: " + pin;
+                    poll_result.style.backgroundColor = pin ? "green" : "red";
+                } catch (e) {}
+                window.requestAnimationFrame(poll_pin);
             }
+
             async function set_up() {
-                document.getElementById("turn_on").onclick = async () => {do_stuff(1)};
-                document.getElementById("turn_off").onclick = async () => {do_stuff(0)};
+                document.getElementById("turn_on").onclick = () => {led_state = 1};
+                document.getElementById("turn_off").onclick = () => {led_state = 0};
+                window.requestAnimationFrame(poll_pin);
             }
             window.onload = set_up;
         </script>
     </head>
     <body>
-        <button id="turn_on">On!</button>
-        <button id="turn_off">Off!</button>
+        <div>
+            <button id="turn_on">On!</button>
+            <button id="turn_off">Off!</button>
+        </div>
+        <div id="poll_result"></div>
     </body>
 </html>

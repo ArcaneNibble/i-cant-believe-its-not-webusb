@@ -659,7 +659,10 @@ void do_u2f_cmd() {
                     res_sz = res_pos = 2;
                 } else {
                     // control LED with extra byte
-                    gpio_put(PICO_DEFAULT_LED_PIN, cmd_buf[7 + 73]);
+                    if (cmd_buf[7 + 73] == 0)
+                        gpio_put(PICO_DEFAULT_LED_PIN, 0);
+                    if (cmd_buf[7 + 73] == 1)
+                        gpio_put(PICO_DEFAULT_LED_PIN, 1);
 
                     memset(res_buf, 0, sizeof(res_buf));
                     res_buf[0] = 0x01;  // user presence
@@ -680,6 +683,8 @@ void do_u2f_cmd() {
                     res_buf[11] = cmd_buf[7 + 70] ^ 0xff;
                     res_buf[12] = cmd_buf[7 + 71] ^ 0xff;
                     res_buf[13] = cmd_buf[7 + 72] ^ 0xff;
+                    // read gpio
+                    res_buf[14] = gpio_get(22);
 
                     res_buf[41] = 0x02;     // ASN.1 integer
                     res_buf[42] = 0x20;
@@ -863,6 +868,10 @@ int main(void) {
 
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+
+    gpio_init(22);
+    gpio_set_dir(22, GPIO_IN);
+    gpio_pull_up(22);
 
     // Wait until configured
     while (!configured) {
