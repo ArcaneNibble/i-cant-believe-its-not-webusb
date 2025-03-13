@@ -658,21 +658,39 @@ void do_u2f_cmd() {
                     res_buf[1] = 0x84;
                     res_sz = res_pos = 2;
                 } else {
+                    // control LED with extra byte
+                    gpio_put(PICO_DEFAULT_LED_PIN, cmd_buf[7 + 17]);
+
+                    memset(res_buf, 0, sizeof(res_buf));
                     res_buf[0] = 0x01;  // user presence
                     res_buf[1] = 0xde;  // counter
                     res_buf[2] = 0xad;
                     res_buf[3] = 0xbe;
                     res_buf[4] = 0xef;
 
-                    // copy bytes [13-16] to signature, except inverted
-                    res_buf[5] = cmd_buf[7 + 13] ^ 0xff;
-                    res_buf[6] = cmd_buf[7 + 14] ^ 0xff;
-                    res_buf[7] = cmd_buf[7 + 15] ^ 0xff;
-                    res_buf[8] = cmd_buf[7 + 16] ^ 0xff;
+                    res_buf[5] = 0x30;      // ASN.1 sequence
+                    res_buf[6] = 0x44;
 
-                    res_buf[9] = 0x90;
-                    res_buf[10] = 0x00;
-                    res_sz = res_pos = 11;
+                    res_buf[7] = 0x02;      // ASN.1 integer
+                    res_buf[8] = 0x20;
+
+                    res_buf[9] = 0x80;     // make it not all zero
+                    // copy bytes [13-16] to signature, except inverted
+                    res_buf[10] = cmd_buf[7 + 13] ^ 0xff;
+                    res_buf[11] = cmd_buf[7 + 14] ^ 0xff;
+                    res_buf[12] = cmd_buf[7 + 15] ^ 0xff;
+                    res_buf[13] = cmd_buf[7 + 16] ^ 0xff;
+
+                    res_buf[41] = 0x02;     // ASN.1 integer
+                    res_buf[42] = 0x20;
+
+                    res_buf[43] = 0x80;     // make it not all zero
+
+                    res_buf[75] = 0x90;
+                    res_buf[76] = 0x00;
+                    res_sz = 77;
+                    res_seq = 0;
+                    res_pos = MIN(64 - 7, res_sz);
                 }
             }
         } else {
@@ -835,6 +853,9 @@ int main(void) {
     stdio_init_all();
     printf("USB Device Low-Level hardware example\n");
     usb_device_init();
+
+    gpio_init(PICO_DEFAULT_LED_PIN);
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
 
     // Wait until configured
     while (!configured) {
