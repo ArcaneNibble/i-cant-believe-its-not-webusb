@@ -640,7 +640,7 @@ void do_u2f_cmd() {
 
             if (cmd_buf[2] == 0x07) {
                 // check-only
-                if (cmd_buf[7 +  9] == 0xfe && cmd_buf[7 + 10] == 0xed && cmd_buf[7 + 11] == 0xfa && cmd_buf[7 + 12] == 0xce) {
+                if (cmd_buf[7 + 65] == 0xfe && cmd_buf[7 + 66] == 0xed && cmd_buf[7 + 67] == 0xfa && cmd_buf[7 + 68] == 0xce) {
                     // ok
                     res_buf[0] = 0x69;
                     res_buf[1] = 0x85;
@@ -652,14 +652,14 @@ void do_u2f_cmd() {
                     res_sz = res_pos = 2;
                 }
             } else {
-                if (!(cmd_buf[7 +  9] == 0xfe && cmd_buf[7 + 10] == 0xed && cmd_buf[7 + 11] == 0xfa && cmd_buf[7 + 12] == 0xce)) {
+                if (!(cmd_buf[7 + 65] == 0xfe && cmd_buf[7 + 66] == 0xed && cmd_buf[7 + 67] == 0xfa && cmd_buf[7 + 68] == 0xce)) {
                     // not ok
                     res_buf[0] = 0x69;
                     res_buf[1] = 0x84;
                     res_sz = res_pos = 2;
                 } else {
                     // control LED with extra byte
-                    gpio_put(PICO_DEFAULT_LED_PIN, cmd_buf[7 + 17]);
+                    gpio_put(PICO_DEFAULT_LED_PIN, cmd_buf[7 + 73]);
 
                     memset(res_buf, 0, sizeof(res_buf));
                     res_buf[0] = 0x01;  // user presence
@@ -676,10 +676,10 @@ void do_u2f_cmd() {
 
                     res_buf[9] = 0x80;     // make it not all zero
                     // copy bytes [13-16] to signature, except inverted
-                    res_buf[10] = cmd_buf[7 + 13] ^ 0xff;
-                    res_buf[11] = cmd_buf[7 + 14] ^ 0xff;
-                    res_buf[12] = cmd_buf[7 + 15] ^ 0xff;
-                    res_buf[13] = cmd_buf[7 + 16] ^ 0xff;
+                    res_buf[10] = cmd_buf[7 + 69] ^ 0xff;
+                    res_buf[11] = cmd_buf[7 + 70] ^ 0xff;
+                    res_buf[12] = cmd_buf[7 + 71] ^ 0xff;
+                    res_buf[13] = cmd_buf[7 + 72] ^ 0xff;
 
                     res_buf[41] = 0x02;     // ASN.1 integer
                     res_buf[42] = 0x20;
@@ -702,12 +702,13 @@ void do_u2f_cmd() {
     }
 
     // common setup for response
+    memset(usb_buf, 0, sizeof(usb_buf));
     memcpy(usb_buf, &cid_in_progress, 4);
     usb_buf[4] = cmd_in_progress;
     usb_buf[5] = res_sz >> 8;
     usb_buf[6] = res_sz;
     memcpy(&usb_buf[7], res_buf, res_pos);
-    usb_start_transfer(ep2, usb_buf, 7 + res_pos);
+    usb_start_transfer(ep2, usb_buf, 64);
 
     if (res_pos == res_sz) {
         cmd_in_progress = 0;
@@ -734,12 +735,13 @@ void ep1_out_handler(uint8_t *buf, uint16_t len) {
                 // CTAPHID_INIT
                 if (bcnt != 8) {
                     // invalid len
+                    memset(usb_buf, 0, sizeof(usb_buf));
                     memcpy(usb_buf, buf, 4);
                     usb_buf[4] = 0xbf;
                     usb_buf[5] = 0;
                     usb_buf[6] = 1;
                     usb_buf[7] = 3;
-                    usb_start_transfer(ep2, usb_buf, 8);
+                    usb_start_transfer(ep2, usb_buf, 64);
                     break;
                 }
 
@@ -751,6 +753,7 @@ void ep1_out_handler(uint8_t *buf, uint16_t len) {
                     new_cid = cid_next;
                 }
 
+                memset(usb_buf, 0, sizeof(usb_buf));
                 memcpy(usb_buf, buf, 4);
                 usb_buf[4] = 0x86;
                 usb_buf[5] = 0;
@@ -762,7 +765,7 @@ void ep1_out_handler(uint8_t *buf, uint16_t len) {
                 usb_buf[21] = 0;
                 usb_buf[22] = 0;
                 usb_buf[23] = 0;
-                usb_start_transfer(ep2, usb_buf, 24);
+                usb_start_transfer(ep2, usb_buf, 64);
                 break;
 
             case 0x81:
@@ -770,12 +773,13 @@ void ep1_out_handler(uint8_t *buf, uint16_t len) {
                 // CTAPHID_MSG or CTAPHID_PING
                 if (cid_in_progress) {
                     // busy
+                    memset(usb_buf, 0, sizeof(usb_buf));
                     memcpy(usb_buf, buf, 4);
                     usb_buf[4] = 0xbf;
                     usb_buf[5] = 0;
                     usb_buf[6] = 1;
                     usb_buf[7] = 6;
-                    usb_start_transfer(ep2, usb_buf, 8);
+                    usb_start_transfer(ep2, usb_buf, 64);
                     break;
                 }
 
@@ -792,12 +796,13 @@ void ep1_out_handler(uint8_t *buf, uint16_t len) {
 
             default:
                 // invalid command
+                memset(usb_buf, 0, sizeof(usb_buf));
                 memcpy(usb_buf, buf, 4);
                 usb_buf[4] = 0xbf;
                 usb_buf[5] = 0;
                 usb_buf[6] = 1;
                 usb_buf[7] = 1;
-                usb_start_transfer(ep2, usb_buf, 8);
+                usb_start_transfer(ep2, usb_buf, 64);
                 break;
         }
     } else {
@@ -814,12 +819,13 @@ void ep1_out_handler(uint8_t *buf, uint16_t len) {
                     do_u2f_cmd();
             } else {
                 // invalid seq
+                memset(usb_buf, 0, sizeof(usb_buf));
                 memcpy(usb_buf, buf, 4);
                 usb_buf[4] = 0xbf;
                 usb_buf[5] = 0;
                 usb_buf[6] = 1;
                 usb_buf[7] = 4;
-                usb_start_transfer(ep2, usb_buf, 8);
+                usb_start_transfer(ep2, usb_buf, 64);
             }
         }
     }
@@ -836,10 +842,11 @@ void ep2_in_handler(__unused uint8_t *buf, uint16_t len) {
 
     if (res_pos != res_sz) {
         uint32_t chunk_sz = MIN(64 - 5, res_sz - res_pos);
+        memset(usb_buf, 0, sizeof(usb_buf));
         memcpy(usb_buf, &cid_in_progress, 4);
         usb_buf[4] = res_seq++;
         memcpy(&usb_buf[5], &res_buf[res_pos], chunk_sz);
-        usb_start_transfer(ep2, usb_buf, 5 + chunk_sz);
+        usb_start_transfer(ep2, usb_buf, 64);
 
         res_pos += chunk_sz;
         if (res_pos == res_sz) {
