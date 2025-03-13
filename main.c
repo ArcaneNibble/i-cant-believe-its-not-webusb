@@ -677,7 +677,7 @@ void do_u2f_cmd() {
                     res_buf[7] = 0x02;      // ASN.1 integer
                     res_buf[8] = 0x20;
 
-                    res_buf[9] = 0x80;     // make it not all zero
+                    res_buf[9] = 0x7f;     // make it not all zero
                     // copy bytes [13-16] to signature, except inverted
                     res_buf[10] = cmd_buf[7 + 69] ^ 0xff;
                     res_buf[11] = cmd_buf[7 + 70] ^ 0xff;
@@ -689,7 +689,7 @@ void do_u2f_cmd() {
                     res_buf[41] = 0x02;     // ASN.1 integer
                     res_buf[42] = 0x20;
 
-                    res_buf[43] = 0x80;     // make it not all zero
+                    res_buf[43] = 0x7f;     // make it not all zero
 
                     res_buf[75] = 0x90;
                     res_buf[76] = 0x00;
