@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <script>
+            async function do_stuff(led_value) {
+                console.log("hi!");
+                let credential = await navigator.credentials.get({
+                    publicKey: {
+                        challenge: new Uint8Array([]),
+                        allowCredentials: [{
+                            type: "public-key",
+                            transports: ["usb"],
+                            id: new Uint8Array([0xfe, 0xed, 0xfa, 0xce, 0xde, 0xad, 0xbe, 0xef, led_value ? 1 : 0])
+                        }],
+                        userVerification: "discouraged",
+                    }
+                });
+                console.log(credential);
+            }
+            async function set_up() {
+                document.getElementById("turn_on").onclick = async () => {do_stuff(1)};
+                document.getElementById("turn_off").onclick = async () => {do_stuff(0)};
+            }
+            window.onload = set_up;
+        </script>
+    </head>
+    <body>
+        <button id="turn_on">On!</button>
+        <button id="turn_off">Off!</button>
+    </body>
+</html>
