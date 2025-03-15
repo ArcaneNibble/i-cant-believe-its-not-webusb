@@ -1,3 +1,21 @@
+# Update: Hi HN et al.!
+
+Other than personal "because I can" reasons, my goal with this proof-of-concept was to point at the utter state of computing platforms.
+
+As a maker of widgets, I would like end-users to be able to do things with their brand-new widgets as painlessly as possible. This is a very relatable "user story" that has driven a lot of innovation ever since the dawn of personal computing.
+
+However, the entire ecosystem of computers and widgets has developed into a state where there are obvious mismatches between what users intuitively expect to be possible and what is "actually" possible. The fact that this hack has been trending is just one data point in support of this -- a "security key" is "supposed to" look like a reasonably-nicely-packaged end product (i.e. not a random RPi Pico) that just does one thing and one thing only, and it's not supposed to intentionally break the rules in a way that doesn't implement any security. The fact that security keys *also* run arbitrary code, can look like anything, and can thus do arbitrary things might be quite obvious to an *extremely* technical audience who pauses to consider the implications, but it was clearly not the intention of even many of the designers involved in creating the infrastructure this hack leverages.
+
+Other ideas which also poke at this problem include the [USB Rubber Ducky](https://shop.hak5.org/products/usb-rubber-ducky) and the [O.MG Cable](https://shop.hak5.org/products/omg-cable). The "Universal" part of USB has both advantages and disadvantages! This is something which I alluded to at the end of this README -- there is currently no good way for *either* humans or computers to easily and reliably tell whether a USB device is working against the user's interests (in simplified terms, "evil"), in support of them ("good"), or simply as a consequence of larger forces and emergent behaviors (a huge category which overlaps most of the former two).
+
+This brings us to WebUSB and the growth and dominance of the Web as a platform. Without fully litigating whether "cross-platform" applications are a good idea or not, the Web is *by far* the easiest way for somebody to deliver software to run on somebody else's computer. I and other developers no longer need to learn the intricacies of every single target platform. As a consequence, I and other developers no longer need to learn the intricacies, the *conventions*, and the *expectations* of every single target platform.
+
+If the popularity of retrocomputing that I am seeing in my little corner of the zeitgeist is any indication, we've lost something important along the way.
+
+In conclusion, I want to see discussions being had which move beyond the basics of "Why won't Firefox implement WebUSB? Is it going to lose out even further to Chrome?" and more towards discussions about intentionally curating healthy platforms and ecosystems. This extends beyond the Web and includes computing in all forms (whether on desktops and laptops, tablets and phones, or much-less-visible automation such as "IoT" and "smart home" devices). Platforms need to be both healthy for developers, so that they enjoy building software for them, and healthy for users, so that they understand what is happening and can engage with computing in a way which empowers them.
+
+I am sure that there are people who have more experience and plenty more to say on these topics than I do, and I look forward to hearing these discussions!
+
 # We don't need no stinkin' WebUSB!
 
 It turns out that there is a way for a web page to access USB devices *without* requiring WebUSB and its associated political disagreements! Not only that, a device can intentionally design itself to bypass all of the user consent requirements.
